@@ -1,5 +1,17 @@
 from imports import *
-
+"""
+Right now, the code is mostly written to for kappa_XY x kappa_CMB where
+kappa_XY is reconstrcuted from 2 lines X and Y at the same redshift.
+For kappa_Null case, we will need XY combination at some other redshift too.
+This has to be added in the code. Since in the example we use in the paper,
+two redshifts are z=5 and z=6, we assume them to be equal in terms of power spectra.
+This should be changed for more accurate results and also for cases when we have
+z1 and z2 very different. This will include calculating the power spectra of
+the lines as well as their interlopers at 2 different redshifts as well as
+interloper bispectrum and trispectrum with the matter field. Although for
+X != Y case, there is only secondary bispectrum effect and that is negligible,
+so these extra non-Gaussian terms do not need to be calculated.
+"""
 
 class Cell_im(object):
 
@@ -13,7 +25,6 @@ class Cell_im(object):
         # ell limits
         self.lMin = self.exp['lMin']
         self.lMax = self.exp['lMax']
-        # self.lMaxP = self.exp['lMaxP']
         self.zc = self.exp['zc']
 
         """
