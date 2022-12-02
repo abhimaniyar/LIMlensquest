@@ -15,8 +15,14 @@ class Cell_im(object):
         self.lMax = self.exp['lMax']
         # self.lMaxP = self.exp['lMaxP']
         self.zc = self.exp['zc']
+
+        """
+        self.dl_to_cl = lambda l: 2.*np.pi/(l*(l+1.))
+        unlensed = np.loadtxt('input/CAMB/qe_lensedCls.dat')
+        fac = self.dl_to_cl(unlensed[:, 0])
+        unlensed[:, 1] *= fac  # *1e-2
+        # """
         # unlensed spectra assumed to be equal to lensed spectra
-        # unlensed = np.loadtxt('input/cl_%s_%s_lmin2_lmax50000.txt' % (self.name, self.zc))
         unlensed = np.loadtxt('input/cl_%s_%s.txt' % (self.name, self.zc))
 
         self.unlensedXX = interp1d(unlensed[:, 0], unlensed[:, 1], kind='linear',
@@ -35,6 +41,7 @@ class Cell_im(object):
                       bounds_error=False, fill_value=0.)
 
         # #################### interloper bispectra ##################
+        # """
         bidata1 = np.loadtxt('input/Bl_1h_matter_Ha_Ha_0.11.txt')
         bidata2 = np.loadtxt('input/Bl_1h_matter_CO43_CO43_0.46.txt')
 
@@ -44,19 +51,45 @@ class Cell_im(object):
                                  bounds_error=False, fill_value=0.)
         self.bispecXY = interp1d(bidata2[:, 0], 0.*bidata2[:, -1], kind='linear',
                                  bounds_error=False, fill_value=0.)
+        """
+        hdulist1 = fits.open('input/Bl_1h_scale_dependent_matter_Ha_Ha_0.11.fits')
+        ell_1 = hdulist1[0].data
+        bidata1 = hdulist1[1].data
+        hdulist1.close()
+
+        hdulist2 = fits.open('input/Bl_1h_scale_dependent_matter_CO43_CO43_0.46.fits')
+        ell_2 = hdulist2[0].data
+        bidata2 = hdulist2[1].data
+        hdulist2.close()
+
+        # bidata1 = np.load('input/Bl_1h_matter_scale_dependent_Ha_Ha_0.11.npy')
+        # bidata2 = np.load('input/Bl_1h_matter_scale_dependent_CO43_CO43_0.46.npy')
+        # ell_bl = bidata1[:, 0]
+        self.bispecXX = rgi((ell_1, ell_1, ell_1), bidata1,
+                            method='linear', bounds_error=False, fill_value=0.)
+        self.bispecYY = rgi((ell_2, ell_2, ell_2), bidata2,
+                            method='linear', bounds_error=False, fill_value=0.)
+        self.bispecXY = rgi((ell_1, ell_1, ell_1), 0.*bidata1,
+                            method='linear', bounds_error=False, fill_value=0.)
+        # """
         # #################### interloper trispectra ##################
         dummy = 1.
         tridata1 = np.loadtxt('input/Tl_shot_Ha_0.11.txt')
         tridata2 = np.loadtxt('input/Tl_shot_CO43_0.46.txt')
 
-        self.trispecXX = interp1d(tridata1[:, 0], dummy*tridata1[:, -1], kind='linear',
+        tridata11 = np.loadtxt('input/Tl_1h_Ha_0.11.txt')
+        tridata22 = np.loadtxt('input/Tl_1h_CO43_0.46.txt')
+
+        # adding only the 1-halo term of the trispectrum. Shot noise is much
+        # smaller. tridata1[:, -1] & tridata2[:, -1]+
+        self.trispecXX = interp1d(tridata1[:, 0], dummy*(tridata11[:, -1]), kind='linear',
                                   bounds_error=False, fill_value=0.)
         """
         self.trispecYY = interp1d(tridata[:, 0], np.zeros(len(tridata[:, 0])),
                                   kind='linear',
                                   bounds_error=False, fill_value=0.)
         # """
-        self.trispecYY = interp1d(tridata2[:, 0], dummy*tridata2[:, -1],
+        self.trispecYY = interp1d(tridata2[:, 0], dummy*(tridata22[:, -1]),
                                   kind='linear',
                                   bounds_error=False, fill_value=0.)
         # """
@@ -73,6 +106,21 @@ class Cell_im(object):
         self.totalXX = lambda l: self.unlensedXX(l)+ha(l)  #  + self.artificialNoise(l, 30, 5000)  # +self.detectorNoise(l, self.whiteXX)  # + self.detectorNoise(l, self.sensitivity_t)
         self.totalYY = lambda l: self.unlensedYY(l)+co(l)  #  + self.artificialNoise(l, 30, 5000) # +self.detectorNoise(l, self.whiteYY)  # + self.detectorNoise(l, self.sensitivity_p)
         self.totalXY = lambda l: self.unlensedXY(l)
+
+        zc1 = self.zc
+        zc2 = 6.  # second redshift for nulling
+        zc3 = 1100.  # cmb
+        self.alphanull = self.alpha_null(zc1, zc2, zc3)
+
+    def alpha_null(self, z1, z2, z3):
+        x1 = cosmo.comoving_distance(z1).value
+        x2 = cosmo.comoving_distance(z2).value
+        x2 = cosmo.comoving_distance(z3).value
+
+        num = (1./z3) - (1./z1)
+        denom = (1./z1) - (1./z2)
+        alpha = num/denom
+        return alpha
 
     def detectorNoise(self, l, white):
         res = np.repeat(white, len(l))
@@ -130,7 +178,7 @@ class Cell_im(object):
         """
         ax.legend(loc=2, fontsize='8')  # , labelspacing=0.1)
         ax.set_xscale('log')
-        ax.set_yscale('log', nonposy='mask')
+        ax.set_yscale('log')  # , nonposy='mask')
         # ax.set_ylim((1.e-15, 1e-9))
         ax.set_xlabel(r'$\ell$', fontsize=16)
         ax.set_ylabel(r'$\ell(\ell+1)C_\ell/2\pi$', fontsize=16)

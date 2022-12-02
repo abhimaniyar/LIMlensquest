@@ -23,18 +23,19 @@ class lensing_estimator(object):
         # a2 = np.logspace(np.log10(110.), np.log10(1500.), 140, 10.)
         # a3 = np.logspace(np.log10(1600.), np.log10(2*self.l1Max+1.), 51, 10.)
         # self.L = np.concatenate((a1, a2, a3))
-        self.L = np.logspace(np.log10(1.), np.log10(2*self.l1Max+1.), 51, 10.)
+        self.L = np.logspace(np.log10(2.), np.log10(2*self.l1Max+1.), 51, 10.)
+        # self.L = np.logspace(np.log10(2.), np.log10(2*self.l1Max+1.), 101, 10.)
         # self.L = np.linspace(1., 201., 1001)
         self.Nl = len(self.L)
-        self.N_phi = 50  # number of steps for angular integration steps
+        self.N_phi = 50  # 200  # number of steps for angular integration steps
         # reduce to 50 if you need around 0.6% max accuracy till L = 3000
         # from 200 to 400, there is just 0.03% change in the noise curves till L=3000
-        self.var_out = 'output/HO02_variance_individual_%s_lmin%s_lmax%s.txt' % (self.name, str(self.im.lMin), str(self.im.lMax))
-        self.covar_out = 'output/HO02_covariance_%s_lmin%s_lmax%s.txt' % (self.name, str(self.im.lMin), str(self.im.lMax))
-        self.primbispec_out = 'output/HO02_primbispec_%s_lmin%s_lmax%s.txt' % (self.name, str(self.im.lMin), str(self.im.lMax))
-        self.secbispec_out = 'output/HO02_secbispec_%s_lmin%s_lmax%s.txt' % (self.name, str(self.im.lMin), str(self.im.lMax))
-        self.trispec_out = 'output/HO02_trispec_%s_lmin%s_lmax%s.txt' % (self.name, str(self.im.lMin), str(self.im.lMax))
-        self.covar_out_ng = 'output/HO02_covariance_nonGaussian_%s_lmin%s_lmax%s.txt' % (self.name, str(self.im.lMin), str(self.im.lMax))
+        self.var_out = 'output/HO02_variance_individual_%s_lmin%s_lmax%s_Nl%s_Nphi%s.txt' % (self.name, str(self.im.lMin), str(self.im.lMax), str(self.Nl), str(self.N_phi))
+        self.covar_out = 'output/HO02_covariance_%s_lmin%s_lmax%s_Nl%s_Nphi%s.txt' % (self.name, str(self.im.lMin), str(self.im.lMax), str(self.Nl), str(self.N_phi))
+        self.primbispec_out = 'output/HO02_primbispec_%s_lmin%s_lmax%s_Nl%s_Nphi%s.txt' % (self.name, str(self.im.lMin), str(self.im.lMax), str(self.Nl), str(self.N_phi))
+        self.secbispec_out = 'output/HO02_secbispec_%s_lmin%s_lmax%s_Nl%s_Nphi%s.txt' % (self.name, str(self.im.lMin), str(self.im.lMax), str(self.Nl), str(self.N_phi))
+        self.trispec_out = 'output/HO02_trispec_%s_lmin%s_lmax%s_Nl%s_Nphi%s.txt' % (self.name, str(self.im.lMin), str(self.im.lMax), str(self.Nl), str(self.N_phi))
+        self.covar_out_ng = 'output/HO02_covariance_nonGaussian_%s_lmin%s_lmax%s_Nl%s_Nphi%s.txt' % (self.name, str(self.im.lMin), str(self.im.lMax), str(self.Nl), str(self.N_phi))
 
     """
     L = l1 + l2
@@ -48,6 +49,20 @@ class lensing_estimator(object):
         mod of l2 = (L-1_1) given phi1
         """
         return np.sqrt(L**2 + l_1**2 - 2*L*l_1*np.cos(phi1))
+
+    def mag_l(self, l_1, l_2, phi_12):
+        """
+        mod of l = (vec(l_1) + vec(l_2)) given phi_12 which is the anngle
+        between them
+        """
+        res = l_1**2 + l_2**2 + 2*l_1*l_2*np.cos(phi_12)
+        # """
+        idx = np.where(res < 0)
+        if idx[0].size > 1:
+            res[idx[0]] = 0.  # np.abs(res[idx[0]])
+        # """
+        # res = np.abs(res)
+        return res  # np.sqrt(l_1**2 + l_2**2 + 2*l_1*l_2*np.cos(phi_12))
 
     def phi12(self, L, l_1, phi1):
         """
@@ -107,21 +122,12 @@ class lensing_estimator(object):
         if XY == 'XX':
             result = self.im.unlensedXX(l_1)*Ldotl_1
             result += self.im.unlensedXX(l_2)*Ldotl_2
-            # print result
-            # sys.exit()
         elif XY == 'YY':
             result = self.im.unlensedYY(l_1)*Ldotl_1
             result += self.im.unlensedYY(l_2)*Ldotl_2
         elif XY == 'XY':
             result = self.im.unlensedXY(l_1)*Ldotl_1
             result += self.im.unlensedXY(l_2)*Ldotl_2
-        """
-        if XY == 'TT':
-            result = self.cmb.lensedTT(l_1)*Ldotl_1
-            result += self.cmb.lensedTT(l_2)*Ldotl_2
-            # print result
-            # sys.exit()
-        # """
         # result *= 2. / L**2
 
         return result
@@ -133,6 +139,7 @@ class lensing_estimator(object):
         Here this is defined for calculating the terms in the secondary
         bispectrum. Here this is defined as
         f_XY(l_1, l_2) = C_(l_1)*[l_1**2 + l_1*l_2*cos(phi12)] + C_(l_2)*[l_2**2 + l_1*l_2*cos(phi12)]
+        Not used in the code.
         """
 
         L12dotl__1 = l__1**2 + l__1*l__2*np.cos(phi_12)
@@ -141,8 +148,6 @@ class lensing_estimator(object):
         if XY == 'XX':
             result = self.im.unlensedXX(l__1)*L12dotl__1
             result += self.im.unlensedXX(l__2)*L12dotl__2
-            # print result
-            # sys.exit()
         elif XY == 'YY':
             result = self.im.unlensedYY(l__1)*L12dotl__1
             result += self.im.unlensedYY(l__2)*L12dotl__2
@@ -168,11 +173,6 @@ class lensing_estimator(object):
             numerator = self.f_XY(L, l_1, phi1, XY)
             denominator = 2.*self.im.totalXX(l_1)*self.im.totalXX(l_2)
             result = numerator/denominator
-            """
-            for i in range(len(denominator)):
-                if denominator[i] == 0.:
-                    print L, l_1[i], self.im.totalXX(l_1)[i], l_2[i], self.im.totalXX(l_2)[i], denominator[i]
-            # """
         elif XY == 'YY':
             numerator = self.f_XY(L, l_1, phi1, XY)
             denominator = 2.*self.im.totalYY(l_1)*self.im.totalYY(l_2)
@@ -190,13 +190,12 @@ class lensing_estimator(object):
         """
         Weighing terms for the estimator.
         This decides the weights for a corresponding pair of multipoles for
-        X and Y.
+        X and Y. Not used in the code.
         """
 
         l_2 = self.l4(L, l__1, phi_1)
         # phi2 = self.phi4(L, l__1, phi_1)
         phi12 = self.phi34(L, l__1, phi_1)  # phi2 - phi_1
-        # print (L, l__1, l_2, l__1+l_2)
 
         if XY == 'XX':
             numerator = self.f_XY_bispec(l__1, l_2, phi12, XY)
@@ -245,13 +244,9 @@ class lensing_estimator(object):
             l_1"""
             result /= (2.*np.pi)**2
             # """
-            # idx = np.where((l_2 < l1min) | (l_2 > l1max))
             idx = np.where((l_1 < l1min) | (l_1 > l1max) | (l_2 < l1min) | (l_2 > l1max))
             # print idx
             result[idx] = 0.
-            # idx2 = np.where(~np.isfinite(result))
-            # print idx2
-            # result[idx2] = 0.
             """
             for nr in range(len(result)):
                 if not np.isfinite(result[nr]):
@@ -260,8 +255,6 @@ class lensing_estimator(object):
             return result
 
 
-        # unlensed = np.loadtxt('input/cl_%s_%s.txt' % (self.name, self.im.zc))
-        # l1 = unlensed[:, 0]
         l1 = np.linspace(l1min, l1max, int(l1max-l1min+1))
         # l1 = np.logspace(np.log10(l1min), np.log10(l1max), int(l1max-l1min+1))
         phi1 = np.linspace(0., np.pi, self.N_phi)
@@ -363,25 +356,17 @@ class lensing_estimator(object):
             l_1"""
             result /= (2.*np.pi)**2
 
-            # idx = np.where((l_2 < l1min) | (l_2 > l1max))
             idx = np.where((l_1 < l1min) | (l_1 > l1max) | (l_2 < l1min) | (l_2 > l1max))
-            # print idx, l_1[idx], l_2[idx]
             result[idx] = 0.
-            # idx2 = np.where(~np.isfinite(result))
-            # result[idx2] = 0.
             """
             for nr in range(len(result)):
                 if not np.isfinite(result[nr]):
                     result[nr] = 0.
             """
-            # print result
             return result
 
         # """
-        # unlensed = np.loadtxt('input/cl_%s_%s.txt' % (self.name, self.im.zc))
-        # l1 = unlensed[:, 0]
         l1 = np.linspace(l1min, l1max, int(l1max-l1min+1))
-        # print l1min, l1max
         phi1 = np.linspace(0., np.pi, self.N_phi)
         int_1 = np.zeros(len(phi1))
         for i in range(len(phi1)):
@@ -389,7 +374,6 @@ class lensing_estimator(object):
             int_1[i] = integrate.simps(intgnd, x=l1, even='avg')
         int_l1 = integrate.simps(int_1, x=phi1, even='avg')
         result = int_l1**2
-        # print result
         # """
 
         result *= self.var_d[XY](L)**2
@@ -464,6 +448,13 @@ class lensing_estimator(object):
             # """
 
             result = self.F_XY(L, l_1, phil, XY)
+            if XY == 'XX':
+                result *= self.im.bispecXX(L)  # (np.array([[L, l_1, l_2]]))
+            elif XY == 'YY':
+                result *= self.im.bispecYY(L)  # ([L, l_1, l_2])
+            else:
+                result *= self.im.bispecXY(L)  # ([L, l_1, l_2])
+
             result *= 2*l_1  # **2
             # d^2l_1 = dl_1*l_1*dphi1
             """factor of 2 above because phi integral is symmetric. Thus we've
@@ -472,23 +463,16 @@ class lensing_estimator(object):
             l_1"""
             result /= (2.*np.pi)**2
 
-            # idx = np.where((l_2 < l1min) | (l_2 > l1max))
             idx = np.where((l_1 < l1min) | (l_1 > l1max) | (l_2 < l1min) | (l_2 > l1max))
-            # print idx, l_1[idx], l_2[idx]
             result[idx] = 0.
-            # idx2 = np.where(~np.isfinite(result))
-            # result[idx2] = 0.
             """
             for nr in range(len(result)):
                 if not np.isfinite(result[nr]):
                     result[nr] = 0.
             """
-            # print result
             return result
 
         # """
-        # unlensed = np.loadtxt('input/cl_%s_%s.txt' % (self.name, self.im.zc))
-        # l1 = unlensed[:, 0]
         l1 = np.linspace(l1min, l1max, int(l1max-l1min+1))
         # print l1min, l1max
         phi1 = np.linspace(0., np.pi, self.N_phi)
@@ -498,18 +482,14 @@ class lensing_estimator(object):
             int_1[i] = integrate.simps(intgnd, x=l1, even='avg')
         int_l1 = integrate.simps(int_1, x=phi1, even='avg')
         result = int_l1
-        # print result
         # """
+        #
+        result *= 2*self.var_d[XY](L)  # **2
+        result *= 1./L  # **2
 
-        result *= 2*self.var_d[XY](L)**2
-        if XY == 'XX':
-            result *= self.im.bispecXX(L)
-        elif XY == 'YY':
-            result *= self.im.bispecYY(L)
-        else:
-            result *= self.im.bispecXY(L)
-
-        result *= 1./L**2
+        # # bispec here should be from B^{dgg} instead of B^{kappa gg}
+        # as the code calculates the bias terms for C_l{dd}
+        result *= -2./L
 
         if not np.isfinite(result):
             result = 0.
@@ -554,7 +534,7 @@ class lensing_estimator(object):
             norm = data[:, counter].copy()
             self.pbi_d[XY+XY] = interp1d(L, norm, kind='linear', bounds_error=False, fill_value=0.)
             if XY == 'XX' or XY == 'YY':
-                res = L*self.pbi_d[XY+XY](L)/2./self.var_d[XY](L)
+                res = self.pbi_d[XY+XY](L)/2.  # /self.var_d[XY](L)
                 self.pbi_d[XY+'CMB'] = interp1d(L, res, kind='linear', bounds_error=False, fill_value=0.)
             counter += 1
 
@@ -581,15 +561,31 @@ class lensing_estimator(object):
                 phi_23 = phi_2 - phi_3
                 phi_24 = phi_2 - phi_4
 
-                if XY == 'XX' or XY == 'YY':
+                l_13 = self.mag_l(l_1, l_3, phi_13)
+                l_14 = self.mag_l(l_1, l_4, phi_14)
+                l_23 = self.mag_l(l_2, l_3, phi_23)
+                l_24 = self.mag_l(l_2, l_4, phi_24)
+
+                # # bispec here should be from B^{phi gg} instead of
+                # B^{kappa gg} which I get from Manu, thus multiplying by
+                # 2/L**2
+                if XY == 'XX':  #  or XY == 'YY':
                     # result = self.f_XY_bispec(l_3, l_4, phi_3-phi_4, XY)  # self.f_XY_bispec(l_3, l_4, phi_3-phi_4, XY)
-                    result = self.f_XY_bispec(l_1, l_3, phi_13, XY)  # l__1, l__2, phi_12, XY
-                    result += self.f_XY_bispec(l_1, l_4, phi_14, XY)
-                    result += self.f_XY_bispec(l_2, l_3, phi_23, XY)
-                    result += self.f_XY_bispec(l_2, l_4, phi_24, XY)
+                    result = self.f_XY_bispec(l_1, l_3, phi_13, XY)*self.im.bispecXX(L)*(-2./l_13**2)  # ([l_13, l_2, l_4])  # l__1, l__2, phi_12, XY
+                    result += self.f_XY_bispec(l_1, l_4, phi_14, XY)*self.im.bispecXX(L)*(-2./l_14**2)  # ([l_14, l_2, l_3])
+                    result += self.f_XY_bispec(l_2, l_3, phi_23, XY)*self.im.bispecXX(L)*(-2./l_23**2)  # ([l_23, l_1, l_4])
+                    result += self.f_XY_bispec(l_2, l_4, phi_24, XY)*self.im.bispecXX(L)*(-2./l_24**2)  # ([l_24, l_1, l_3])
+                    result[~np.isfinite(result)] = 0.
+                elif XY == 'YY':
+                    result = self.f_XY_bispec(l_1, l_3, phi_13, XY)*self.im.bispecYY(L)*(-2./l_13**2)  # ([l_13, l_2, l_4])  # l__1, l__2, phi_12, XY
+                    result += self.f_XY_bispec(l_1, l_4, phi_14, XY)*self.im.bispecYY(L)*(-2./l_14**2)  # ([l_14, l_2, l_3])
+                    result += self.f_XY_bispec(l_2, l_3, phi_23, XY)*self.im.bispecYY(L)*(-2./l_23**2)  # ([l_23, l_1, l_4])
+                    result += self.f_XY_bispec(l_2, l_4, phi_24, XY)*self.im.bispecYY(L)*(-2./l_24**2)  # ([l_24, l_1, l_3])
+                    result[~np.isfinite(result)] = 0.
                 else:
-                    result = self.im.bispecYY(L)*self.f_XY_bispec(l_1, l_3, phi_13, 'XX')
-                    result += self.im.bispecXX(L)*self.f_XY_bispec(l_2, l_4, phi_13, 'YY')
+                    result = self.f_XY_bispec(l_1, l_3, phi_13, 'XX')*self.im.bispecYY(L)*(-2./l_13**2)  # ([l_13, l_2, l_4])
+                    result += self.f_XY_bispec(l_2, l_4, phi_24, 'YY')*self.im.bispecXX(L)*(-2./l_24**2)  # ([l_24, l_1, l_3])
+                    result[~np.isfinite(result)] = 0.
 
                 result *= self.F_XY_bispec(L, l_3, phi_3, XY)  # *2
                 result *= l_3  # **2
@@ -600,22 +596,16 @@ class lensing_estimator(object):
                 l_1"""
                 result /= (2.*np.pi)**2
 
-                # idx = np.where((l_2 < l1min) | (l_2 > l1max))
                 idx = np.where((l_1 < l1min) | (l_1 > l1max) | (l_2 < l1min) | (l_2 > l1max) | (l_3 < l1min) | (l_3 > l1max) | (l_4 < l1min) | (l_4 > l1max))
-                # print idx, l_1[idx], l_2[idx]
                 result[idx] = 0.
-                # idx2 = np.where(~np.isfinite(result))
-                # result[idx2] = 0.
                 """
                 for nr in range(len(result)):
                     if not np.isfinite(result[nr]):
                         result[nr] = 0.
                 """
-                # print result
                 return result
 
             l3 = np.linspace(l1min, l1max, int(l1max-l1min+1))
-            # print l1min, l1max
             phi3 = np.linspace(0., 2*np.pi, self.N_phi)
             int_3 = np.zeros(len(phi3))
             for i in range(len(phi3)):
@@ -639,25 +629,17 @@ class lensing_estimator(object):
             l_1"""
             result /= (2.*np.pi)**2
 
-            # idx = np.where((l_2 < l1min) | (l_2 > l1max))
             idx = np.where((l_1 < l1min) | (l_1 > l1max) | (l_2 < l1min) | (l_2 > l1max))
-            # print idx, l_1[idx], l_2[idx]
             result[idx] = 0.
-            # idx2 = np.where(~np.isfinite(result))
-            # result[idx2] = 0.
             """
             for nr in range(len(result)):
                 if not np.isfinite(result[nr]):
                     result[nr] = 0.
             """
-            # print result
             return result
 
         # """
-        # unlensed = np.loadtxt('input/cl_%s_%s.txt' % (self.name, self.im.zc))
-        # l1 = unlensed[:, 0]
         l1 = np.linspace(l1min, l1max, int(l1max-l1min+1))
-        # print l1min, l1max
         phi1 = np.linspace(0., np.pi, self.N_phi)
         int_1 = np.zeros(len(phi1))
         for i in range(len(phi1)):
@@ -665,17 +647,17 @@ class lensing_estimator(object):
             int_1[i] = integrate.simps(intgnd, x=l1, even='avg')
         int_l1 = integrate.simps(int_1, x=phi1, even='avg')
         result = int_l1
-        # print result
         # """
 
         result *= self.var_d[XY](L)**2
+        """
         if XY == 'XX':
             result *= self.im.bispecXX(L)
         elif XY == 'YY':
             result *= self.im.bispecYY(L)
         else:
             result *= 1.  # self.im.bispecXY(L) (bispectrum factors already multiplied at the integration level)
-
+        # """
         result *= 1./L**2
 
         if not np.isfinite(result):
@@ -762,25 +744,17 @@ class lensing_estimator(object):
             l_1"""
             result /= (2.*np.pi)**2
 
-            # idx = np.where((l_2 < l1min) | (l_2 > l1max))
             idx = np.where((l_1 < l1min) | (l_1 > l1max) | (l_2 < l1min) | (l_2 > l1max))
-            # print idx, l_1[idx], l_2[idx]
             result[idx] = 0.
-            # idx2 = np.where(~np.isfinite(result))
-            # result[idx2] = 0.
             """
             for nr in range(len(result)):
                 if not np.isfinite(result[nr]):
                     result[nr] = 0.
             """
-            # print result
             return result
 
         # """
-        # unlensed = np.loadtxt('input/cl_%s_%s.txt' % (self.name, self.im.zc))
-        # l1 = unlensed[:, 0]
         l1 = np.linspace(l1min, l1max, int(l1max-l1min+1))
-        # print l1min, l1max
         phi1 = np.linspace(0., np.pi, self.N_phi)
         int_1 = np.zeros(len(phi1))
         for i in range(len(phi1)):
@@ -788,7 +762,6 @@ class lensing_estimator(object):
             int_1[i] = integrate.simps(intgnd, x=l1, even='avg')
         int_l1 = integrate.simps(int_1, x=phi1, even='avg')
         result = int_l1
-        # print result
         # """
 
         result *= self.var_d[XY](L)*self.var_d[AB](L)
@@ -814,10 +787,21 @@ class lensing_estimator(object):
             phi_2 = self.phi2(L, l_1, phi_1)
 
             if XY == 'XX' and AB == 'YY':
-                a = self.F_XY(L, l_1, phi_1, XY)*self.im.bispecXX(L)
-                a += self.F_XY(L, l_1, phi_1, AB)*self.im.bispecYY(L)
+                a = self.F_XY(L, l_1, phi_1, XY)*self.var_d[XY](L)*self.im.bispecXX(L)  # ([L, l_1, l_2])
+                a += self.F_XY(L, l_1, phi_1, AB)*self.var_d[AB](L)*self.im.bispecYY(L)  # ([L, l_1, l_2])
+                # a *= self.var_d[XY](L)*self.var_d[AB](L)
+                a *= 1./L
+                a *= -2./L  # B^{d g g} to B^{kappa g g}
 
             elif (XY == 'XX')*(AB == 'XY') or (XY == 'YY')*(AB == 'XY'):
+                if XY == 'XX' and AB == 'XY':  # XX-XY pair also has a primary bispectrum component
+                    a1 = self.F_XY(L, l_1, phi_1, XY)*self.var_d[XY](L)*self.im.bispecXX(L)
+                    a1 *= 1./L
+                    a1 *= -2./L  # B^{d g g} to B^{kappa g g}
+                elif XY == 'YY' and AB == 'XY':
+                    a1 = self.F_XY(L, l_1, phi_1, XY)*self.var_d[XY](L)*self.im.bispecYY(L)
+                    a1 *= 1./L
+                    a1 *= -2./L  # B^{d g g} to B^{kappa g g}
 
                 def integrand2(l_3, phi_3):
                     l_4 = self.l4(L, l_3, phi_3)
@@ -827,14 +811,21 @@ class lensing_estimator(object):
                     phi_23 = phi_2 - phi_3
                     phi_24 = phi_2 - phi_4
 
+                    l_13 = self.mag_l(l_1, l_3, phi_13)
+                    l_14 = self.mag_l(l_1, l_4, phi_14)
+                    l_23 = self.mag_l(l_2, l_3, phi_23)
+                    l_24 = self.mag_l(l_2, l_4, phi_24)
+
                     if XY == 'XX' and AB == 'XY':
-                        result = self.f_XY_bispec(l_1, l_4, phi_14, AB)  # l__1, l__2, phi_12, XY
-                        result += self.f_XY_bispec(l_2, l_4, phi_24, AB)
-                        result *= self.im.bispecXX(L)
+                        result = self.f_XY_bispec(l_1, l_4, phi_14, AB)*self.im.bispecXX(L)*(-2./l_14**2)  # ([l_14, l_2, l_3])
+                        result += self.f_XY_bispec(l_2, l_4, phi_24, AB)*self.im.bispecXX(L)*(-2./l_24**2)  # ([l_24, l_1, l_3])
+                        result[~np.isfinite(result)] = 0.
+                        # result *= self.im.bispecXX(L)
                     elif XY == 'YY' and AB == 'XY':
-                        result = self.f_XY_bispec(l_3, l_1, -phi_13, AB)
-                        result += self.f_XY_bispec(l_3, l_2, -phi_23, AB)
-                        result *= self.im.bispecYY(L)
+                        result = self.f_XY_bispec(l_3, l_1, -phi_13, AB)*self.im.bispecYY(L)*(-2./l_13**2)  # ([l_13, l_2, l_4])
+                        result += self.f_XY_bispec(l_3, l_2, -phi_23, AB)*self.im.bispecYY(L)*(-2./l_23**2)  # ([l_23, l_1, l_4])
+                        result[~np.isfinite(result)] = 0.
+                        # result *= self.im.bispecYY(L)
 
                     result *= self.F_XY_bispec(L, l_3, phi_3, AB)  # *2
                     result *= l_3  # **2
@@ -847,9 +838,8 @@ class lensing_estimator(object):
                     idx = np.where((l_1 < l1min) | (l_1 > l1max) | (l_2 < l1min) | (l_2 > l1max) | (l_3 < l1min) | (l_3 > l1max) | (l_4 < l1min) | (l_4 > l1max))
                     result[idx] = 0.
                     return result
-    
+
                 l3 = np.linspace(l1min, l1max, int(l1max-l1min+1))
-                # print l1min, l1max
                 phi3 = np.linspace(0., 2*np.pi, self.N_phi)
                 int_3 = np.zeros(len(phi3))
                 for i in range(len(phi3)):
@@ -857,10 +847,16 @@ class lensing_estimator(object):
                     int_3[i] = integrate.simps(intgnd, x=l3, even='avg')
                 int_l3 = integrate.simps(int_3, x=phi3, even='avg')
                 a = int_l3
-
                 a *= self.F_XY(L, l_1, phi_1, XY)
+                a *= self.var_d[XY](L)*self.var_d[AB](L)
+                a *= 1./L**2
+                # a[np.isnan(a)] = 0.
 
-            result = a  # *self.F_XY(L, l_1, phi_1, XY)
+            if (XY == 'XX')*(AB == 'XY') or (XY == 'YY')*(AB == 'XY'):
+                result = a + a1  # +   # *self.F_XY(L, l_1, phi_1, XY)
+            else:
+                result = a  # *self.F_XY(L, l_1, phi_1, XY)
+
             result *= 2*l_1  # **2
             # d^2l_1 = dl_1*l_1*dphi1
             """factor of 2 above because phi integral is symmetric. Thus we've
@@ -869,18 +865,13 @@ class lensing_estimator(object):
             l_1"""
             result /= (2.*np.pi)**2
 
-            # idx = np.where((l_2 < l1min) | (l_2 > l1max))
             idx = np.where((l_1 < l1min) | (l_1 > l1max) | (l_2 < l1min) | (l_2 > l1max))
-            # print idx, l_1[idx], l_2[idx]
             result[idx] = 0.
-            # idx2 = np.where(~np.isfinite(result))
-            # result[idx2] = 0.
             """
             for nr in range(len(result)):
                 if not np.isfinite(result[nr]):
                     result[nr] = 0.
             """
-            # print result
             return result
 
         l1 = np.linspace(l1min, l1max, int(l1max-l1min+1))
@@ -892,8 +883,8 @@ class lensing_estimator(object):
         int_l1 = integrate.simps(int_1, x=phi1, even='avg')
         result = int_l1
 
-        result *= self.var_d[XY](L)*self.var_d[AB](L)
-        result *= 1./L**2
+        # result *= self.var_d[XY](L)*self.var_d[AB](L)
+        # result *= 1./L**2
 
         if not np.isfinite(result):
             result = 0.
@@ -946,6 +937,7 @@ class lensing_estimator(object):
                 data_ng[:, counter_ng] = cov_XY_AB_nG[XY+AB]
                 # counter_ng += 1
 
+        """
         # min variance estimator noise
         n_mv = np.zeros(self.Nl)
         for el in range(self.Nl):
@@ -960,12 +952,15 @@ class lensing_estimator(object):
             try:
                 invcov = np.linalg.inv(covmat)
                 n_mv[el] = 1./np.sum(invcov)
-                # np.savetxt('covmat.txt', covmat)
+                # if el == 6:
+                #     print (self.L[el])
+                #     np.savetxt('output/covmat.txt', covmat)
             except:
                 print("exception while inverting the covariance matrix at L = %s !" % str(el))
                 pass
 
         data[:, -1] = n_mv
+        """
         np.savetxt(self.covar_out, data)
         np.savetxt(self.covar_out_ng, data_ng)
 
@@ -1015,29 +1010,30 @@ class lensing_estimator(object):
         n_est = len(est)
         for i_est in range(n_est):
             XY = est[i_est]
-            if XY == 'XX' or XY == 'YY':
-                varind = self.var_d[XY](self.L)
-                tri = self.tri_d[XY+XY](self.L)
-                pbi = self.pbi_d[XY+XY](self.L)
-                sbi = self.sbi_d[XY+XY](self.L)
-                tot = varind + tri + pbi + sbi
+            # if XY == 'XX' or XY == 'YY' :
+            varind = self.var_d[XY](self.L)
+            tri = self.tri_d[XY+XY](self.L)
+            pbi = self.pbi_d[XY+XY](self.L)
+            sbi = self.sbi_d[XY+XY](self.L)
+            tot = varind + tri + pbi + sbi
 
-                # ax.plot(self.L, self.L*(self.L+1)*tot/(2*np.pi), c=plt.cm.rainbow(i_est/3.), ls = '-', lw=1.5, label=XY+' total')
-                # ax.plot(self.L, self.L*(self.L+1)*varind/(2*np.pi), c=plt.cm.rainbow(i_est+1/3.), ls = '--', lw=1.0, label=XY+' auto')
-                # ax.plot(self.L, self.L*(self.L+1)*tri/(2*np.pi), c=plt.cm.rainbow(i_est+2/3.), ls='-.', lw=1.0, label=XY+' tri')
-                ax.plot(self.L, self.L*(self.L+1)*pbi/(2*np.pi), c='r', ls=':', lw=1.0, label=XY+' p-bi')
-                ax.plot(self.L, self.L*(self.L+1)*sbi/(2*np.pi), c='b', ls=':', lw=1.0, label=XY+' s-bi')
+            ax.plot(self.L, self.L*(self.L+1)*tot/(2*np.pi), c=plt.cm.rainbow(i_est/3.), ls = '-', lw=1.5, label=XY+' total')
+            # ax.plot(self.L, self.L*(self.L+1)*varind/(2*np.pi), c=plt.cm.rainbow(i_est+1/3.), ls = '--', lw=1.0, label=XY+' auto')
+            # ax.plot(self.L, self.L*(self.L+1)*tri/(2*np.pi), c=plt.cm.rainbow(i_est+2/3.), ls='-.', lw=1.0, label=XY+' tri')
+            # ax.plot(self.L, self.L*(self.L+1)*pbi/(2*np.pi), c='r', ls=':', lw=1.0, label=XY+' p-bi')
+            # ax.plot(self.L, self.L*(self.L+1)*sbi/(2*np.pi), c='b', ls=':', lw=1.0, label=XY+' s-bi')
+            """
             else:
                 varind = self.var_d[XY](self.L)
                 tot = varind
                 ax.plot(self.L, self.L*(self.L+1)*tot/(2*np.pi), c=plt.cm.rainbow(i_est/3.), ls = '-', lw=1.5, label=XY+' total')
-                
+            """ 
 
         # ax.plot(self.L, self.L*(self.L+1)*tri/(2*np.pi), 'p--', lw=1.5, label='XX Trispectrum')
         # totXX = self.var_d['XX'](self.L)  + self.tri_d['XX'+'XX'](self.L)
         # ax.plot(self.L, self.L*(self.L+1)*totXX/(2*np.pi), 'p-.', lw=1.5, label='XX Total')
 
-        # ax.plot(self.L, self.L*(self.L+1)*self.var_d['mv'](self.L)/(2*np.pi), 'k', lw=1.5, label='min var')
+        ax.plot(self.L, self.L*(self.L+1)*self.var_d['mv'](self.L)/(2*np.pi), 'k--', lw=1.5, label='min var')
 
         ax.legend(fontsize='12', loc='lower left')  # , labelspacing=0.1)
         ax.set_xscale('log')
@@ -1053,13 +1049,16 @@ class lensing_estimator(object):
         lines = ["-", "--", "-.", ":"]
         cl = ["b", "r", "g", "k"]
 
-        fig = plt.figure()
+        fig = plt.figure(figsize=(11.5, 7))
         ax = fig.add_subplot(111)
 
-        data2 = np.genfromtxt("input/CAMB/Julien_lenspotentialCls.dat")
+        # data2 = np.genfromtxt("input/CAMB/Julien_lenspotentialCls.dat")
+        data2 = np.genfromtxt('input/p2d_limz5lenshalofit.txt')
         L = data2[:, 0]
-        ax.plot(L, data2[:, 5], 'r-', lw=1.5, label=r'signal')
+        # ax.plot(L, data2[:, 5], 'r-', lw=1.5, label=r'signal')
+        ax.plot(L, data2[:, 1]+data2[:, 2], 'k-', lw=2.5, label=r'Lensing signal')
 
+        dl = self.L*(self.L+1)/4  # (2*np.pi)
         n_est = len(est)
         for i_est in range(n_est):
             XY = est[i_est]
@@ -1067,13 +1066,13 @@ class lensing_estimator(object):
             tri = self.tri_d[XY+XY](self.L)
             pbi = self.pbi_d[XY+XY](self.L)
             sbi = self.sbi_d[XY+XY](self.L)
-            tot = varind + tri + pbi + sbi
+            tot = varind + tri + pbi   # + sbi
 
-            ax.plot(self.L, self.L*(self.L+1)*tot/(2*np.pi), c=cl[0], ls = lines[0], lw=1.5, label=XY+' total')
-            ax.plot(self.L, self.L*(self.L+1)*varind/(2*np.pi), c=cl[0], ls = lines[0], lw=1.0, alpha=0.5, label=XY+' auto')
-            ax.plot(self.L, self.L*(self.L+1)*tri/(2*np.pi), c=cl[0], ls= lines[1], lw=1.0, label=XY+' tri')
-            ax.plot(self.L, self.L*(self.L+1)*pbi/(2*np.pi), c=cl[0], ls= lines[2], lw=1.0, label=XY+' p-bi')
-            ax.plot(self.L, self.L*(self.L+1)*sbi/(2*np.pi), c=cl[0], ls= lines[3], lw=1.0, label=XY+' s-bi')
+            # ax.plot(self.L, dl*tot, c=cl[0], ls=lines[0], lw=1.5, label='Total auto')
+            ax.plot(self.L, dl*varind, c=cl[0], ls=lines[0], lw=2.0, label=r'Noise bias $N^{(0)}$')
+            ax.plot(self.L, dl*np.abs(pbi), c=cl[0], ls=lines[2], lw=2.0, label='Primary bispectrum interloper bias')
+            # ax.plot(self.L, dl*np.abs(sbi), c=cl[0], ls=lines[3], lw=1.0, label='Secondary bispectrum interloper bias')
+            ax.plot(self.L, dl*tri, c=cl[0], ls=lines[1], lw=2.0, label='Trispectrum interloper bias')
 
         # ax.plot(self.L, self.L*(self.L+1)*tri/(2*np.pi), 'p--', lw=1.5, label='XX Trispectrum')
         # totXX = self.var_d['XX'](self.L)  + self.tri_d['XX'+'XX'](self.L)
@@ -1081,27 +1080,30 @@ class lensing_estimator(object):
 
         # ax.plot(self.L, self.L*(self.L+1)*self.var_d['mv'](self.L)/(2*np.pi), 'k', lw=1.5, label='min var')
 
-        ax.legend(fontsize='12', loc='lower left')  # , labelspacing=0.1)
+        ax.legend(fontsize='18', bbox_to_anchor=(0.38, 0.45))  # , labelspacing=0.1)
         ax.set_xscale('log')
         ax.set_yscale('log', nonposy='mask')
-        ax.set_xlabel(r'$L$', fontsize=16)
-        ax.set_ylabel(r'$L(L+1)N_L^{\phi \phi}/2\pi$', fontsize=16)
-        # ax.set_ylim((1e-9, 4.e-6))
-        ax.set_xlim((5., 4.e3))
-        ax.tick_params(axis='both', labelsize=12)
+        ax.set_xlabel(r'$L$', fontsize=24)
+        ax.set_ylabel(r'$C_L^{\hat{\kappa}_{XX}}$', fontsize=26)
+        ax.set_ylim((1e-10))  # , 4.e-6))
+        ax.set_xlim((5., 2.e3))
+        ax.tick_params(axis='both', labelsize=20)
         plt.show()
+        # plt.savefig('output/Figures/HO02_curves_onlyLya_allcomp_Ha_0.11_addedto_Lya_5_1halotrispec.pdf', bbox_inches="tight")
 
     def plot_cov_gaussian_total(self, est):
         lines = ["-", "--", "-."]
         cl = ["g", "b", "r", "k"]
 
-        fig = plt.figure()
+        fig = plt.figure(figsize=(10.5, 7))
         ax = fig.add_subplot(111)
 
-        data2 = np.genfromtxt("input/CAMB/Julien_lenspotentialCls.dat")
+        # data2 = np.genfromtxt("input/CAMB/Julien_lenspotentialCls.dat")
+        data2 = np.genfromtxt('input/p2d_limz5lenshalofit.txt')
         L = data2[:, 0]
-        ax.plot(L, data2[:, 5], 'k-', lw=1.5, label=r'signal')
+        ax.plot(L, data2[:, 1]+data2[:, 2], 'k-', lw=1.5, label=r'Lensing signal')
 
+        dl = self.L*(self.L+1)/4  # (2*np.pi)
         n_est = len(est)
         for i_est in range(n_est):
             XY = est[i_est]
@@ -1111,32 +1113,35 @@ class lensing_estimator(object):
             sbi = self.sbi_d[XY+XY](self.L)
             tot = varind + tri + pbi + sbi
 
-            ax.plot(self.L, self.L*(self.L+1)*tot/(2*np.pi), c=cl[i_est], ls = '-', lw=1.5, label=XY+' total')
-            ax.plot(self.L, self.L*(self.L+1)*varind/(2*np.pi), c=cl[i_est], ls = '--', lw=1.0, label=XY+' auto')
+            ax.plot(self.L, dl*tot, c=cl[i_est], ls = '-', lw=1.5, label='noise '+XY+' total')
+            ax.plot(self.L, dl*varind, c=cl[i_est], ls = '--', lw=1.0, label='noise '+XY+' auto')
 
-        ax.legend(fontsize='12', loc='lower left')  # , labelspacing=0.1)
+        ax.legend(fontsize='12', loc='upper right')  # , frameon=False)  # , labelspacing=0.1)
         ax.set_xscale('log')
         ax.set_yscale('log', nonposy='mask')
         ax.set_xlabel(r'$L$', fontsize=16)
-        ax.set_ylabel(r'$L(L+1)N_L^{\phi \phi}/2\pi$', fontsize=16)
-        # ax.set_ylim((1e-9, 4.e-6))
+        ax.set_ylabel(r'$C_L^{\kappa \kappa}$', fontsize=16)
+        ax.set_ylim((1e-9))  # , 4.e-6))
         ax.set_xlim((5., 4.e3))
         ax.tick_params(axis='both', labelsize=12)
         plt.show()
 
     def plot_kappa_pairs(self, pairs):
         lines = ["-", "--", "-."]
-        cl = ["g", "b", "r", "k", "m"]
+        cl = ["g", "b", "r", "c", "tab:gray", "m"]
 
-        fig = plt.figure()
+        fig = plt.figure(figsize=(11.0, 8.3))
         ax = fig.add_subplot(111)
         # ax = plt.subplot(111)
 
-        data2 = np.genfromtxt("input/CAMB/Julien_lenspotentialCls.dat")
+        # data2 = np.genfromtxt("input/CAMB/Julien_lenspotentialCls.dat")
+        data2 = np.genfromtxt('input/p2d_limz5lenshalofit.txt')
         L = data2[:, 0]
+        ax.plot(L, data2[:, 1]+data2[:, 2], 'k-', lw=2.5, label=r'Lensing signal')
 
+        dl = self.L*(self.L+1)/4  # (2*np.pi)
         n_p = len(pairs)
-        coeff = 1e23
+        coeff = 1  # 1e9  # 1e23
         for i_p in range(n_p):
             if pairs[i_p] == 'XX-XX':
                 XY = 'XX'
@@ -1144,17 +1149,25 @@ class lensing_estimator(object):
                 tri = self.tri_d[XY+XY](self.L)
                 pbi = self.pbi_d[XY+XY](self.L)
                 sbi = self.sbi_d[XY+XY](self.L)
-                tot = tri + pbi + sbi + varind
-                ax.plot(self.L, coeff*self.L*(self.L+1)*tot/(2*np.pi), c=cl[i_p], ls = '-', lw=1.5, label=XY+'-'+XY)
+                tot = np.abs(tri + pbi)  #  + sbi)   # + varind
+                ax.plot(self.L, coeff*dl*tot, c=cl[i_p], ls='-', lw=2.0, label=XY+'-'+XY)
+                print ('XX-XX', dl[:5], tot[:5])
             elif pairs[i_p] == 'XX-YY':
-                tot = self.cov_d_ng['XXYY'](self.L)
-                ax.plot(self.L, coeff*self.L*(self.L+1)*tot/(2*np.pi), c=cl[i_p], ls = '-', lw=1.5, label='XX-YY')
+                tot = np.abs(self.cov_d_ng['XXYY'](self.L))
+                ax.plot(self.L, coeff*dl*tot, c=cl[i_p], ls='-', lw=2.0, label='XX-YY')
+                print ('XX-YY', dl[:5], tot[:5])
             elif pairs[i_p] == 'XX-XY':
-                tot = self.cov_d_ng['XXXY'](self.L)
-                ax.plot(self.L, coeff*self.L*(self.L+1)*tot/(2*np.pi), c=cl[i_p], ls = '-', lw=1.5, label='XX-XY')
+                tot = np.abs(self.cov_d_ng['XXXY'](self.L))
+                ax.plot(self.L, coeff*dl*tot, c=cl[i_p], ls='-', lw=2.0, label='XX-XY')
+                print ('XX-XY', dl[:5], tot[:5])
+            elif pairs[i_p] == 'XY-XY':
+                tot = np.abs(self.cov_d_ng['XYXY'](self.L))
+                ax.plot(self.L, coeff*dl*tot, c=cl[i_p], ls='-', lw=2.0, label='XY-XY')
+                print ('XY-XY', dl[:5], tot[:5])
             elif pairs[i_p] == 'XX-CMB':
-                tot = self.pbi_d['XXCMB'](self.L)
-                ax.plot(self.L, coeff*self.L*(self.L+1)*tot/(2*np.pi), c=cl[i_p], ls = '-', lw=1.5, label='XX-CMB')
+                tot = np.abs(self.pbi_d['XXCMB'](self.L))
+                ax.plot(self.L, coeff*dl*tot, c=cl[i_p], ls='-', lw=2.0, label='XX-CMB')
+                print ('XX-CMB', tot[:5])
             """
             elif pairs[i_p] == 'XY-CMB':
                 tot = np.zeros(len(self.L))
@@ -1169,18 +1182,19 @@ class lensing_estimator(object):
 
         ax.set_xscale('log')
         ax.set_yscale('log')
-        # ax.set_ylim((3e-23, 0.09))
-        ax.set_ylim((2., 0.09e23))
+        # ax.set_ylim((1e-10, 0.02))
+        # ax.set_ylim((2., 0.09e23))
         ax.spines['bottom'].set_visible(False)
         ax.xaxis.set_visible(False)
-        plt.title(r'bias to $L(L+1)C_L^{\phi \phi}/2\pi \: \times 10^{23}$', fontsize=16)
+        ax.set_ylabel(r'${\rm Foreground \: bias \: to} \: C_L^{\hat{\kappa}_{XX}}$', fontsize=22)
+        # plt.title(r'${\rm Foreground \: bias \: to} \: C_L^{\kappa \kappa}$', fontsize=16)
 
         divider = make_axes_locatable(ax)
         axLin = divider.append_axes("bottom", size=2.0, pad=0.02, sharex=ax)
         for i_p in range(n_p):
             if pairs[i_p] == 'XY-CMB':
                 tot = np.zeros(len(self.L))
-                axLin.plot(self.L, self.L*(self.L+1)*tot/(2*np.pi), c=cl[i_p], ls = '-', lw=1.5, label='XY-CMB')
+                axLin.plot(self.L, self.L*(self.L+1)*tot/(2*np.pi), c=cl[i_p], ls = '-', lw=2.0, label='XY-CMB')
             elif pairs[i_p] == 'XY-YZ':
                 tot = np.zeros(len(self.L))
                 axLin.plot(self.L, self.L*(self.L+1)*tot/(2*np.pi), c=cl[i_p], ls = '-', lw=1.5, label='XY-YZ')
@@ -1188,17 +1202,37 @@ class lensing_estimator(object):
                 tot = np.zeros(len(self.L))
                 axLin.plot(self.L, self.L*(self.L+1)*tot/(2*np.pi), c=cl[i_p], ls = '-', lw=1.5, label='XY-ZW')
         # axLin.plot(xdomain, np.sin(xdomain))
-        axLin.set_xscale('linear')
-        # axLin.set_ylim((-0.1, 3e-23))
-        axLin.set_ylim((-0.5, 2.))
+        axLin.set_xscale('log')
+        axLin.set_ylim((-1e-14, 1e-14))
+        # """
+        y_ticks = [-1e-14, 0., 1e-14]  # , 1e-10]
+        # ytick_labels = [r'-0.5 $\times 10^{-10}$', '0.0', r'0.5 $\times 10^{-10}$']  # , r'10^{-10}$']
+        ytick_labels = [r'$-10^{-14}$', '0.0', r'$10^{-14}$']  # , r'10^{-10}$']
+        # """
+        axLin.set_yticks(y_ticks)
+        axLin.set_yticklabels(ytick_labels)
+        """
+        ax = plt.gca()
+        ax.spines['top'].set_color('none')
+        ax.spines['right'].set_color('none')
+        ax.xaxis.set_ticks_position('bottom')
+        ax.spines['bottom'].set_position(('data', 0))
+        # ax.yaxis.set_ticks_position('left')
+        # ax.spines['left'].set_position(('data',0))
+        plt.xticks(x_ticks, xtick_labels, fontsize='small', rotation=45)
+        """
+        # axLin.set_ylim((-0.5, 2.))
         axLin.spines['top'].set_visible(False)
-        axLin.set_xlabel(r'$L$', fontsize=18)
+        axLin.set_xlabel(r'$L$', fontsize=24)
         # ax.set_ylabel(r'$L(L+1)N_L^{\phi \phi}/2\pi$', fontsize=16)
-        ax.set_xlim((5., 4.e3))
-        ax.tick_params(axis='both', labelsize=12)
-        ax.legend(fontsize='14', loc='lower right')  # , labelspacing=0.1)
-        axLin.legend(fontsize='14', loc='upper right')  # , labelspacing=0.1)
+        ax.set_xlim((5., 2.e3))
+        axLin.set_xlim((5., 2.e3))
+        ax.tick_params(axis='both', labelsize=20)
+        axLin.tick_params(labelsize=20)
+        ax.legend(fontsize='16', loc='lower right', bbox_to_anchor=(0.95, -0.06), frameon=False)  # , labelspacing=0.1)
+        axLin.legend(fontsize='16', loc='upper right', bbox_to_anchor=(0.87, 1.02), frameon=False)  # , labelspacing=0.1)
         plt.show()
+        # plt.savefig('output/Figures/biasto_kappaxkappa.pdf', bbox_inches="tight")
 
     def plot_cov_pair(self):
         fig = plt.figure()
@@ -1255,6 +1289,272 @@ class lensing_estimator(object):
         ax.tick_params(axis='both', labelsize=14)
         plt.show()
 
+    def snr_clkappakappa(self, est, fsky):
+        nl = 51
+        ell = np.logspace(np.log10(2.), np.log10(2*self.l1Max+1.), nl, 10.)
+        data2 = np.genfromtxt("input/p2d_cmblenshalofit.txt")
+        L = data2[:, 0]
+        cl_kappacmb = interp1d(L, data2[:, 1]+data2[:, 2],
+                               kind='linear', bounds_error=False,
+                               fill_value=0.)
+        kappalim = np.loadtxt('input/p2d_limz5lenshalofit.txt')
+        cl_kappaXY = interp1d(kappalim[:, 0], kappalim[:, 1]+kappalim[:, 2],
+                              kind='linear', bounds_error=False, fill_value=0.)
+
+        kappacmblim = np.loadtxt('input/p2d_cmblenslimz5lenshalofit.txt')
+        cl_crosskappa = interp1d(kappacmblim[:, 0], kappacmblim[:, 1]+kappacmblim[:, 2],
+                                 kind='linear', bounds_error=False,
+                                 fill_value=0.)
+        # ###### adding files for cl_kappa_null ###############
+        kappanull = np.loadtxt('input/p2d_nulllenshalofit.txt')
+        cl_kappanull = interp1d(kappanull[:, 0],
+                                kappanull[:, 1]+kappanull[:, 2], kind='linear',
+                                bounds_error=False, fill_value=0.)
+
+        kappacmbnull = np.loadtxt('input/p2d_cmblensnulllenshalofit.txt')
+        cl_crosskappanull = interp1d(kappacmbnull[:, 0],
+                                     kappacmbnull[:, 1]+kappacmbnull[:, 2],
+                                     kind='linear', bounds_error=False,
+                                     fill_value=0.)
+
+        alpha = self.im.alphanull
+        """
+        for noise on kappa_null, we ignore the sec. bispectrum noise caused by
+        kappa_XY. So we only consider N0 noise. K_null is combination of
+        kappa_null = kappa_CMB + alpha*kappa_XY1 - (1+alpha)*kappa_XY2
+        Here N0 from different kappa are uncorrelated. That is why, when we
+        take the auto-power spectrum of kappa_null, apart from the auto- and
+        cross-CMB lensing power spectra, we get
+        N0tot = alpha^2 * N0_kappaXY1 + (1+alpha)^2 * N0_kappaXY2 + N0_kappacmb
+        Here we neglect N0_kapacmb assuming it is signal dominated.
+        Another assumption we make is that N0_kappaXY1 = _kappaXY2 in our case
+        as we have XY1 at z=5 and XY2 at z=6. So our final variance comes out
+        to be
+        (2.*alpha^2 + 2.*alpha + 1) * N0_kappaXY
+        """
+        alphaterm = 2.*alpha**2 + 2.*alpha + 1  # (alpha^2 + (1+alpha)^2)
+
+        # n_est = len(est)
+        # for i_est in range(n_est):
+        XY = 'XY'  # est[i_est]
+        """
+        varind = self.var_d[XY](self.L)
+        tri = self.tri_d[XY+XY](self.L)
+        pbi = self.pbi_d[XY+XY](self.L)
+        sbi = self.sbi_d[XY+XY](self.L)
+        cl_XY_totnoise = varind + tri + pbi + sbi
+        cl_phiXY_tot = cl_phiXY(self.L) + cl_XY_totnoise
+        """
+        lcen = np.zeros(nl-1)
+        fcrossbin = np.zeros(nl-1)
+        ftotnoisebin = np.zeros(nl-1)
+        fkappacmbbin = np.zeros(nl-1)
+        fkappaXYbin = np.zeros(nl-1)
+        fkappaXYtot_bin = np.zeros(nl-1)
+        fgaussnoisebin = np.zeros(nl-1)
+        fkappaXYgauss_bin = np.zeros(nl-1)
+
+        fkappanullbin = np.zeros(nl-1)
+        fcrossnullkappabin = np.zeros(nl-1)
+        ftotnoisenullbin = np.zeros(nl-1)
+        fkappanulltot_bin = np.zeros(nl-1)
+
+        for i in range(nl-1):
+            l1 = ell[i]
+            l2 = ell[i+1]
+            lcen[i] = (l1+l2)/2.
+            el = np.linspace(l1, l2, int(l2-l1+1))
+            dl = el*(el+1.)/(4.)
+            deltal = l2-l1
+            """
+            if i==1:
+                print (el)
+                print (deltal)
+                print (cl_crosskappa(el))
+            """
+            fcrossbin[i] = np.sum(cl_crosskappa(el))/deltal
+            fkappacmbbin[i] = np.sum(cl_kappacmb(el))/deltal
+            fkappaXYbin[i] = np.sum(cl_kappaXY(el))/deltal
+            ftotnoisebin[i] = np.sum(dl*(self.var_d[XY](el)+self.tri_d[XY+XY](el)+self.pbi_d[XY+XY](el)))/deltal  # +self.sbi_d[XY+XY](el)
+            fgaussnoisebin[i] = np.sum(dl*self.var_d[XY](el))/deltal
+            fkappaXYtot_bin[i] = fkappaXYbin[i]+ftotnoisebin[i]
+            fkappaXYgauss_bin[i] = fkappaXYbin[i]+fgaussnoisebin[i]
+
+            # bins for null kappa calculation
+            fcrossnullkappabin[i] = np.sum(cl_crosskappanull(el))/deltal
+            fkappanullbin[i] = np.sum(cl_kappanull(el))/deltal
+            ftotnoisenullbin[i] = np.sum(dl*(alphaterm*self.var_d[XY](el)))/deltal  # +self.sbi_d[XY+XY](el)
+            fkappanulltot_bin[i] = fkappanullbin[i]+ftotnoisenullbin[i]
+
+        # print (fcrossbin[:5])
+        num = (2*lcen+1)*deltal*fsky*fcrossbin**2
+        # print (np.shape(cross), np.shape(cibtot), np.shape(galtot))
+        denom = fcrossbin**2 + fkappacmbbin*fkappaXYtot_bin
+        denom_g = fcrossbin**2 + fkappacmbbin*fkappaXYgauss_bin
+        # print (denom[:5])
+        # print (num[:5])
+        snr2 = np.cumsum(num/denom)
+        snr_g2 = np.cumsum(num/denom_g)
+        # print (snr2[:5])
+        snrbin = np.sqrt(snr2)
+        snrbin_g = np.sqrt(snr_g2)
+        print (snrbin[-1])
+        print (snrbin_g[-1])
+
+        # SNR calcultion for null
+        numnull = (2*lcen+1)*deltal*fsky*fcrossnullkappabin**2
+        # print (np.shape(cross), np.shape(cibtot), np.shape(galtot))
+        denomnull = fcrossnullkappabin**2 + fkappacmbbin*fkappanulltot_bin
+        # print (denom[:5])
+        # print (num[:5])
+        snrnull2 = np.cumsum(numnull/denomnull)
+        # print (snr2[:5])
+        snrbinnull = np.sqrt(snrnull2)
+        """
+        fig = plt.figure()
+        ax = fig.add_subplot(111)
+        ax.plot(lcen, snrbin, 'k-', lw=1.5)  # , label=r'CUMSNR')
+        # ax.legend(fontsize='12', loc='upper left')  # , labelspacing=0.1)
+        ax.set_xscale('log')
+        # ax.set_yscale('log', nonposy='mask')
+        ax.set_xlabel(r'$L$', fontsize=16)
+        ax.set_ylabel(r'SNR', fontsize=16)
+        # ax.set_ylim((1e-9, 4.e-6))
+        ax.set_xlim((5., 4.e3))
+        ax.tick_params(axis='both', labelsize=12)
+        plt.show()
+        # """
+        """
+        fig2 = plt.figure()
+        ax2 = fig2.add_subplot(111)
+        ax2.plot(lcen, fcrossbin, 'k-', lw=1.5, label=r'signal')
+        ax2.plot(lcen, ftotnoisebin, 'b-', lw=1.5, label=r'noise')
+        ax2.legend(fontsize='12', loc='upper right')  # , labelspacing=0.1)
+        ax2.set_xscale('log')
+        ax2.set_yscale('log', nonposy='mask')
+        ax2.set_xlabel(r'$L$', fontsize=16)
+        ax2.set_ylabel(r'$C_L^{\kappa_{\rm CMB} \kappa_{\rm XY}}$', fontsize=16)
+        # ax.set_ylim((1e-9, 4.e-6))
+        ax2.set_xlim((5., 4.e3))
+        ax2.tick_params(axis='both', labelsize=12)
+        plt.show()
+        # """
+        return lcen, snrbin, snrbin_g, snrbinnull
+
+    def snr_clkappanullkappacmb(self, est, fsky):
+        nl = 51
+        ell = np.logspace(np.log10(2.), np.log10(2*self.l1Max+1.), nl, 10.)
+        data2 = np.genfromtxt("input/p2d_cmblenshalofit.txt")
+        L = data2[:, 0]
+        cl_kappacmb = interp1d(L, data2[:, 1]+data2[:, 2],
+                               kind='linear', bounds_error=False,
+                               fill_value=0.)
+
+        kappanull = np.loadtxt('input/p2d_nulllenshalofit.txt')
+        cl_kappanull = interp1d(kappanull[:, 0], kappanull[:, 1]+kappanull[:, 2],
+                                kind='linear', bounds_error=False, fill_value=0.)
+
+        kappacmbnull = np.loadtxt('input/p2d_cmblensnulllenshalofit.txt')
+        cl_crosskappa = interp1d(kappacmbnull[:, 0], kappacmbnull[:, 1]+kappacmbnull[:, 2],
+                                 kind='linear', bounds_error=False,
+                                 fill_value=0.)
+        
+        alpha = self.im.alphanull
+        alphaterm = 2.*alpha**2 + 2.*alpha + 1  # (alpha^2 + (1+alpha)^2)
+        # n_est = len(est)
+        # for i_est in range(n_est):
+        XY = 'XY'  # est[i_est]
+        """
+        varind = self.var_d[XY](self.L)
+        tri = self.tri_d[XY+XY](self.L)
+        pbi = self.pbi_d[XY+XY](self.L)
+        sbi = self.sbi_d[XY+XY](self.L)
+        cl_XY_totnoise = varind + tri + pbi + sbi
+        cl_phiXY_tot = cl_phiXY(self.L) + cl_XY_totnoise
+        """
+        lcen = np.zeros(nl-1)
+        fcrossbin = np.zeros(nl-1)
+        ftotnoisebin = np.zeros(nl-1)
+        fkappacmbbin = np.zeros(nl-1)
+        fkappanullbin = np.zeros(nl-1)
+        fkappanulltot_bin = np.zeros(nl-1)
+        fgaussnoisebin = np.zeros(nl-1)
+        fkappanullgauss_bin = np.zeros(nl-1)
+
+        for i in range(nl-1):
+            l1 = ell[i]
+            l2 = ell[i+1]
+            lcen[i] = (l1+l2)/2.
+            el = np.linspace(l1, l2, int(l2-l1+1))
+            dl = el*(el+1.)/(4.)
+            deltal = l2-l1
+
+            fcrossbin[i] = np.sum(cl_crosskappa(el))/deltal
+            fkappacmbbin[i] = np.sum(cl_kappacmb(el))/deltal
+            fkappanullbin[i] = np.sum(cl_kappanull(el))/deltal
+            ftotnoisebin[i] = np.sum(dl*(alphaterm*self.var_d[XY](el)))/deltal  # +self.sbi_d[XY+XY](el)
+            fgaussnoisebin[i] = np.sum(dl*alphaterm*self.var_d[XY](el))/deltal
+            fkappanulltot_bin[i] = fkappanullbin[i]+ftotnoisebin[i]
+            fkappanullgauss_bin[i] = fkappanullbin[i]+fgaussnoisebin[i]
+
+        num = (2*lcen+1)*deltal*fsky*fcrossbin**2
+        denom = fcrossbin**2 + fkappacmbbin*fkappanulltot_bin
+        denom_g = fcrossbin**2 + fkappacmbbin*fkappanullgauss_bin
+        snr2 = np.cumsum(num/denom)
+        snr_g2 = np.cumsum(num/denom_g)
+        snrbin = np.sqrt(snr2)
+        snrbin_g = np.sqrt(snr_g2)
+        print (snrbin[-1])
+        print (snrbin_g[-1])
+        return lcen, snrbin, snrbin_g
+
+    def A_bias_XX(self, fsky):
+        kappalim = np.loadtxt('input/p2d_limz5lenshalofit.txt')
+        cl_kappaXY = interp1d(kappalim[:, 0], kappalim[:, 1]+kappalim[:, 2],
+                              kind='linear', bounds_error=False, fill_value=0.)
+        
+        # n_est = len(est)
+        # for i_est in range(n_est):
+        XY = 'XX'  # est[i_est]
+        lcen = np.zeros(self.Nl-1)
+        ftotnoisebin = np.zeros(self.Nl-1)
+        fkappaXYbin = np.zeros(self.Nl-1)
+        fkappaXYtot_bin = np.zeros(self.Nl-1)
+        fgaussnoisebin = np.zeros(self.Nl-1)
+        fkappaXYgauss_bin = np.zeros(self.Nl-1)
+        fbias_bin = np.zeros(self.Nl-1)
+        # fbias_Ahat_bin = np.zeros(self.Nl-1)
+
+        for i in range(self.Nl-1):
+            l1 = self.L[i]
+            l2 = self.L[i+1]
+            lcen[i] = (l1+l2)/2.
+            el = np.linspace(l1, l2, int(l2-l1+1))
+            dl = el*(el+1.)/(4.)
+            deltal = l2-l1
+            """
+            if i==1:
+                print (el)
+                print (deltal)
+                print (cl_crosskappa(el))
+            """
+            fkappaXYbin[i] = np.sum(cl_kappaXY(el))/deltal
+            ftotnoisebin[i] = np.sum(dl*(self.var_d[XY](el)+self.tri_d[XY+XY](el)+self.pbi_d[XY+XY](el)))/deltal  # +self.sbi_d[XY+XY](el)
+            fgaussnoisebin[i] = np.sum(dl*self.var_d[XY](el))/deltal
+            fkappaXYtot_bin[i] = fkappaXYbin[i]+ftotnoisebin[i]
+            fkappaXYgauss_bin[i] = fkappaXYbin[i]+fgaussnoisebin[i]
+            fbias_bin[i] = np.sum(dl*(self.tri_d[XY+XY](el)+np.abs(self.pbi_d[XY+XY](el))))/deltal  # +self.sbi_d[XY+XY](el)
+
+        sigma_denom = (2*lcen+1)*deltal*fsky
+        sigma_num = 2*fkappaXYtot_bin**2
+        sigma_bin2 = sigma_num/sigma_denom
+
+        num = np.cumsum(fbias_bin*fkappaXYbin/sigma_bin2)
+        denom = np.cumsum(fkappaXYbin**2/sigma_bin2)
+
+        bias_Ahat = num/denom
+        return lcen, bias_Ahat
+
 
 if __name__ == '__main__':
     import time
@@ -1264,16 +1564,20 @@ if __name__ == '__main__':
     from cell_im import *
 
     time0 = time()
-    
+
+    fam = "serif"
+    plt.rcParams["font.family"] = fam
+
     # """
     # first
-    first = {"name": "Lya_CII", "lMin": 30., "lMax": 4000.,
+    first = {"name": "Lya_CII", "lMin": 30., "lMax": 1500.,
           "zc": 5.}
 
     im = Cell_im(first)
 
     l_est = lensing_estimator(im)
 
+    # est = ['XX']  # , 'YY', 'XY']
     est = ['XX', 'YY', 'XY']
 
     # l_est.calc_var(est)
@@ -1290,11 +1594,120 @@ if __name__ == '__main__':
     # l_est.calc_cov(est)
     l_est.interp_cov(est)
     # l_est.plot_cov(est)
-    # l_est.plot_cov_XX(['XY'])
+    # l_est.plot_cov_XX(['XX'])
     # l_est.plot_cov_pair()
     # l_est.plot_cov_gaussian_total(est)
     # l_est.plot_corrcoef(est)
-    pairs = ['XX-XX', 'XX-YY', 'XX-XY', 'XX-CMB', 'XY-CMB']
-    l_est.plot_kappa_pairs(pairs)
-    # """
+    pairs = ['XX-XX', 'XX-YY', 'XX-XY', 'XY-XY', 'XX-CMB', 'XY-CMB']
+    # l_est.plot_kappa_pairs(pairs)
+
+    fsky = 0.4
+    # lmaxarray = np.array([300., 600., 1000., 1500.])  # , 2000., 3000., 4000.])
+    lmaxarray = np.array([600., 1000., 1500., 2000., 3000.])  # , 4000.])
+
+    def plt_multlmax_snr(maxlarray):
+        lines = ["-", "--", "-."]
+        cl = ["g", "b", "r", "c", "k", "m"]
+
+        fig = plt.figure(figsize=(11, 8))
+        ax = fig.add_subplot(111)
+        for i in range(len(maxlarray)):
+            first = {"name": "Lya_CII", "lMin": 30., "lMax": maxlarray[i],
+                     "zc": 5.}
+            im = Cell_im(first)    
+            l_est = lensing_estimator(im)
+            l_est.interp_var(est)
+            l_est.interp_trispec(est)
+            l_est.interp_primbispec(est)
+            l_est.interp_secbispec(est)
+            # l_est.interp_cov(est)
+
+            theta = 180.*60./maxlarray[i]
+            lcen, snrbin, snrbin_g, snrnull = l_est.snr_clkappakappa(est, fsky)
+            ax.plot(lcen, snrbin, c=cl[i], ls='--', label=r"$\ell_\mathrm{max \: LIM}$ = %d  (%d$^{'}$)" % (maxlarray[i], theta))
+            # lcen, snrbin, snrbin_g = l_est.snr_clkappanullkappacmb(est, fsky)
+            ax.plot(lcen, snrnull, c=cl[i], ls='-')  # , label=r'lMax = %d' % (maxlarray[i]))
+
+        ax.plot([], [], c='k', ls='-', label=r"$C_L^{\hat{\kappa}_{\rm Null} \hat{\kappa}_{\rm CMB}}$")
+        ax.plot([], [], c='k', ls='--', label=r"$C_L^{\hat{\kappa}_{\rm XY} \hat{\kappa}_{\rm CMB}}$")
+        ax.legend(fontsize='18', loc='lower right', frameon=False)  # , labelspacing=0.1)
+        ax.set_xscale('log')
+        ax.set_yscale('log')  # , nonposy='mask')
+        ax.set_xlabel(r'$L$', fontsize=24)
+        # ax.set_ylabel(r'Cumulative SNR $C_L^{\hat{\kappa}_{\rm XY} \hat{\kappa}_{\rm CMB}}$', fontsize=24)
+        ax.set_ylabel(r'Cumulative SNR $C_L^{\hat{\kappa} \hat{\kappa}}$', fontsize=24)
+        ax.set_ylim(ymin=0.07, ymax=300)
+        ax.set_xlim((5., 3.e3))
+        ax.tick_params(axis='both', labelsize=20)
+        ax2 = ax.secondary_yaxis("right")
+        ax2.tick_params(axis="y", direction="out", labelright=False)
+        plt.show()
+        # plt.savefig('output/Figures/cumSNR_Cl^kappaXYkappaCMB_diff_lmax_fsky%s.pdf' %(fsky), bbox_inches="tight")
+        # plt.savefig('output/Figures/cumSNR_Cl^kappaXYkappaCMB_Cl^kappanullkappaCMB_diff_lmax_fsky%s.pdf' %(fsky), bbox_inches="tight")
+        # plt.savefig('output/Figures/cumSNR_Cl^kappaXYkappaCMB_Cl^kappanullkappaCMB_diff_lmax_fsky%s_alphaincluded.pdf' %(fsky), bbox_inches="tight")
+
+    plt_multlmax_snr(lmaxarray)
+
+    def plt_multlmax_Abias(maxlarray):
+        lines = ["-", "--", "-."]
+        cl = ["g", "b", "r", "c", "k", "m"]
+
+        fig = plt.figure(figsize=(9, 7))
+        ax = fig.add_subplot(111)
+        for i in range(len(maxlarray)):
+            first = {"name": "Lya_CII", "lMin": 30., "lMax": maxlarray[i],
+                     "zc": 5.}
+            im = Cell_im(first)    
+            l_est = lensing_estimator(im)
+            l_est.interp_var(est)
+            l_est.interp_trispec(est)
+            l_est.interp_primbispec(est)
+            l_est.interp_secbispec(est)
+            # l_est.interp_cov(est)
+
+            lcen, bias_Ahat = l_est.A_bias_XX(fsky)
+            ax.plot(lcen, bias_Ahat, c=cl[i], ls='-', label=r'$\ell_\mathrm{max \: LIM}$ = %d' % (maxlarray[i]))
+            # ax.plot(lcen, snrbin_g, c=cl[i], ls='--')  # , label=r'lMax = %d' % (maxlarray[i]))
+
+        # ax.plot([], [], c='k', ls='-', label="Total noise bias")
+        # ax.plot([], [], c='k', ls='--', label="Gaussian noise bias")
+        ax.legend(fontsize='14', loc='upper right', frameon=False)  # , labelspacing=0.1)
+        ax.set_xscale('log')
+        # ax.set_yscale('log')  # , nonposy='mask')
+        ax.set_xlabel(r'$L_{\rm max}$', fontsize=24)
+        ax.set_ylabel(r'Bias on $C_L^{\hat{\kappa}_{\rm XX} \hat{\kappa}_{\rm XX}}$', fontsize=24)
+        ax.set_ylim(ymax=0.9)
+        ax.set_xlim((5., 3.e3))
+        ax.tick_params(axis='both', labelsize=20)
+        plt.show()
+        # plt.savefig('output/Figures/cumbias_Cl^kappaXXkappaXX_diff_lmax_fsky%s_1halotrispecadded.pdf' %(fsky), bbox_inches="tight")
+
+    # plt_multlmax_Abias(lmaxarray)
+
+    def plt_di_dz():
+        z = np.linspace(0, 7, 100)
+        y = np.zeros(len(z))
+        x_ticks = [0.09, 0.11, 0.46, 0.56, 0.82, 1.56, 1.7]
+        xtick_labels = ['0.09', '0.11', '0.46', '0.56', '0.82', '1.56', '5.0']
+        """
+        fig = plt.figure()
+        ax = fig.add_subplot(111)
+        ax.plot(z, y)
+        ax.set_xlabel(r'$z$', fontsize=16)
+        ax.set_ylabel(r'$dI/dz$', fontsize=16)
+        ax.set_xticks(x_ticks)
+        ax.set_xticklabels(xtick_labels)
+        """
+        ax = plt.gca()
+        ax.spines['top'].set_color('none')
+        ax.spines['right'].set_color('none')
+        ax.xaxis.set_ticks_position('bottom')
+        ax.spines['bottom'].set_position(('data', 0))
+        # ax.yaxis.set_ticks_position('left')
+        # ax.spines['left'].set_position(('data',0))
+        plt.xticks(x_ticks, xtick_labels, fontsize='small', rotation=45)
+        plt.ylim()
+        plt.show()
+
+    # plt_di_dz()
     print(time()-time0)
