@@ -1,4 +1,12 @@
 from imports import *
+"""
+Right now, the code is mostly written to for kappa_XY x kappa_CMB where
+kappa_XY is reconstrcuted from 2 lines X and Y at the same redshift.
+For kappa_Null case, we will need XY combination at some other redshift too.
+This has to be added in the code. Since in the example we use in the paper,
+two redshifts are z=5 and z=6, we assume them to be equal in terms of power spectra.
+This should be changed for more accurate results.
+"""
 
 
 class lensing_estimator(object):
